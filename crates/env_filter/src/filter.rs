@@ -1,7 +1,9 @@
-use std::env;
-use std::fmt;
-use std::mem;
+use core::fmt;
+use core::mem;
 
+use alloc::borrow::ToOwned;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 use log::{LevelFilter, Metadata, Record};
 
 use crate::enabled;
@@ -48,10 +50,11 @@ impl Builder {
     }
 
     /// Initializes the filter builder from an environment.
+    #[cfg(feature = "std")]
     pub fn from_env(env: &str) -> Builder {
         let mut builder = Builder::new();
 
-        if let Ok(s) = env::var(env) {
+        if let Ok(s) = std::env::var(env) {
             builder.parse(&s);
         }
 
@@ -108,7 +111,10 @@ impl Builder {
         } = parse_spec(filters);
 
         for error in errors {
+            #[cfg(feature = "std")]
             eprintln!("warning: {error}, ignoring it");
+            #[cfg(not(feature = "std"))]
+            log::warn!("{error}, ignoring it");
         }
 
         self.filter = filter;
@@ -258,7 +264,10 @@ impl fmt::Debug for Filter {
 
 #[cfg(test)]
 mod tests {
+    use alloc::vec::Vec;
+    use alloc::{borrow::ToOwned, vec};
     use log::{Level, LevelFilter};
+    #[cfg(feature = "std")]
     use snapbox::{assert_data_eq, str};
 
     use super::{enabled, Builder, Directive, Filter};
@@ -486,7 +495,9 @@ mod tests {
 
     #[test]
     fn try_parse_invalid_filter() {
+        #[cfg_attr(not(feature = "std"), expect(unused))]
         let error = Builder::new().try_parse("info,crate1=invalid").unwrap_err();
+        #[cfg(feature = "std")]
         assert_data_eq!(
             error,
             str!["error parsing logger filter: invalid logging spec 'invalid'"]
